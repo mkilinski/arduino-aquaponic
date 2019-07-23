@@ -1,0 +1,147 @@
+
+// Load the LiquidCrystal library, which will give us
+// commands to interface to the LCD:
+#include <LiquidCrystal.h>
+
+// Initialize the library with the pins we're using.
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+byte up_arrow[8] = {    //creating arrows
+  B00100,
+  B01010,
+  B10101,
+  B00100,
+  B00100,
+  B00100,
+  B00100,
+};
+
+byte down_arrow[8] = {    //creating arrows
+  B00100,
+  B00100,
+  B00100,
+  B00100,
+  B10101,
+  B01010,
+  B00100,
+};
+
+// Constant bucket of type "byte" of which Float Switch is pluged into which pin
+const byte FloatSwitchPinTop = 8;
+
+// Constant bucket of type "byte" of which Float Switch is pluged into which pin
+const byte FloatSwitchPinBottom = 9;
+
+// Constant bucket of type "byte" which pin the Drain Relay is pluged into
+const byte DrainRelayPin = 1;
+
+// Constant bucket of type "byte" which pin the Pump Relay is pluged into
+const byte PumpRelayPin = 0;
+
+// Find INTERVAL (after this point) and replace with 1000
+#define INTERVAL 1000
+
+#define UP_ARROW "\x1" 
+
+#define DOWN_ARROW "\x2"
+
+void setup() {
+
+  // Sets the mode of the pin (DrainRelayPin) to Output
+  // Pin will be written to (not read)
+  digitalWrite (DrainRelayPin, 1); //May have stopped the flickering
+  digitalWrite (PumpRelayPin, 1);  //May have stopped the flickering
+  pinMode (DrainRelayPin, OUTPUT);
+  pinMode (PumpRelayPin, OUTPUT);
+  delay (4000);
+
+  //telling lcd of arrows
+  lcd.createChar(1, up_arrow);
+  lcd.createChar(2, down_arrow);
+  // set up the LCD's number of columns and rows:
+  lcd.begin(16, 2);
+
+  // Sets the mode of the float switches to Input
+  // Pin will be read (not written to)
+  pinMode (FloatSwitchPinTop, INPUT_PULLUP);
+  pinMode (FloatSwitchPinBottom, INPUT_PULLUP);
+  
+}
+// defined functions
+// call like "turnOnRelay(DrainRelayPin);"
+void turnOnRelay(byte pin_num) {
+
+  digitalWrite(pin_num, LOW);// LOW = circuit closed, HIGH = circuit open
+
+}
+
+// call like "turnOffRelay(DrainRelayPin);"
+void turnOffRelay(byte pin_num) {
+
+  digitalWrite(pin_num, HIGH);// LOW = circuit closed, HIGH = circuit open
+
+}
+
+void loop() {
+  
+  // Grow bed is full of water, turns off water pump, turns on drain
+  if( digitalRead(FloatSwitchPinTop) == HIGH && digitalRead(FloatSwitchPinBottom) == HIGH)
+  {
+     // Report via LCD 
+     lcd.print("Float Top" UP_ARROW " Bot" UP_ARROW);
+     lcd.setCursor(0, 1); // bottom left
+     lcd.print("PMP OFF   DRN ON");
+   
+     turnOnRelay(DrainRelayPin);  
+     turnOffRelay(PumpRelayPin); 
+  }
+  // Grow bed is empty of water, turns on water pump, turns off drain
+  else if(digitalRead(FloatSwitchPinTop) == LOW && digitalRead(FloatSwitchPinBottom) == LOW) 
+  {
+     // Report via LCD 
+     lcd.print("Float Top" DOWN_ARROW " Bot" DOWN_ARROW);
+     lcd.setCursor(0, 1); // bottom left
+     lcd.print("PMP ON   DRN OFF");
+   
+     turnOffRelay(DrainRelayPin);  
+     turnOnRelay(PumpRelayPin);
+  }
+  // Grow bed has middling water level, check status of relays and report
+  else if(digitalRead(FloatSwitchPinTop) == LOW && digitalRead(FloatSwitchPinBottom) == HIGH)
+  {
+    lcd.print("Float Top" DOWN_ARROW " Bot" UP_ARROW);
+    lcd.setCursor(0, 1); // bottom left
+    
+    if(digitalRead(DrainRelayPin) == HIGH && digitalRead(PumpRelayPin) == LOW) //Filling with water
+    {
+      // Report via LCD
+      lcd.print("PMP ON   DRN OFF");
+    }
+    else if(digitalRead(DrainRelayPin) == LOW && digitalRead(PumpRelayPin) == HIGH) //Draining the water
+    {
+      // Report via LCD 
+      lcd.print("PMP OFF   DRN ON");
+    }
+    else
+    {
+      // Report via LCD 
+      lcd.print("ERROR");
+
+      turnOffRelay(DrainRelayPin);  
+      turnOffRelay(PumpRelayPin);
+    }
+  }
+  // Float switches are giving illogical readings, turns off both relays
+  else
+  {
+     // Report via LCD 
+     lcd.print("Float Top" UP_ARROW " Bot" DOWN_ARROW);
+     lcd.setCursor(0, 1); // bottom left
+     lcd.print("ERROR");
+
+     turnOffRelay(DrainRelayPin);  
+     turnOffRelay(PumpRelayPin);
+  }
+  delay (INTERVAL);   
+  lcd.clear();
+}
